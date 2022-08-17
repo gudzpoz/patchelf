@@ -1749,14 +1749,19 @@ void ElfFile<ElfFileParamNames>::cleanDependencySymbolVersions()
             checkPointer(fileContents, next, sizeof(Elf_Vernaux));
             
             if (!allVersions.count(rdi(vern_aux->vna_other) & ~0x8000)) {
-                debug("Removing version identifier %d %s@%s\n", rdi(vern_aux->vna_other), file, ver_name);
+                debug("removing version identifier %d %s@%s\n", rdi(vern_aux->vna_other), file, ver_name);
                 /* Symbol version is no longer used, unlink it. */
                 if (!prev) {
                     auto next_off = (intptr_t)(vern_aux) + rdi(vern_aux->vna_next) - (intptr_t)(ver_r);
                     wri(ver_r->vn_aux, next_off);
                 } else {
-                    auto next_off = (intptr_t)(vern_aux) + rdi(vern_aux->vna_next) - (intptr_t)(prev);
-                    wri(prev->vna_next, next_off);
+                    auto raw_next = rdi(vern_aux->vna_next);
+                    if (raw_next == 0) {
+                        wri(prev->vna_next, 0);
+                    } else {
+                        auto next_off = (intptr_t)(vern_aux) + raw_next - (intptr_t)(prev);
+                        wri(prev->vna_next, next_off);
+                    }
                 }
                 wri(ver_r->vn_cnt, rdi(ver_r->vn_cnt) - 1);
             } else {
@@ -1765,7 +1770,7 @@ void ElfFile<ElfFileParamNames>::cleanDependencySymbolVersions()
 
             if (vern_aux == next) {
                 if (j != rdi(ver_r->vn_cnt)) {
-                    debug("Section missing elements! Ended on element %d, expected %d\n", j, rdi(ver_r->vn_cnt));
+                    debug("section missing elements: ended on element %d, expected %d\n", j, rdi(ver_r->vn_cnt));
                 }
                 break;
             }
